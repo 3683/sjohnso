@@ -35,5 +35,3 @@ $ which azure
 $ azure config mode arm
 info:    New mode is arm
 ```
-
-The work directory is /home/nonrootuser/.azure-cli
