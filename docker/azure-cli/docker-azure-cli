@@ -1,0 +1,23 @@
+#!/bin/sh
+
+HOMEDIR=$(awk -F: -v v="${SUDO_USER}" '{if ($1==v) print $6}' /etc/passwd)
+GROUP=$(awk -F: -v v="$(awk -F: -v v="${SUDO_USER}" '{if ($1==v) print $4}' /etc/passwd)" '{if ($3==v) print $1}' /etc/group)
+DIR=${HOMEDIR}/.azure-cli
+IMAGE=azure-cli:0.9.10
+
+if [ ! -d "${DIR}" ] ; then
+   install -o "${SUDO_USER}" -g "${GROUP}" -m 0700 -d "${DIR}"
+   if [ $? != 0 ] ; then
+      echo "ERROR: unable to create ${DIR}"
+      exit 1
+   fi
+   if $(which chcon >/dev/null 2>&1) ; then
+      chcon -t svirt_sandbox_file_t "${DIR}"
+      if [ $? != 0 ] ; then
+         echo "ERROR: unable to change SELinux context of ${DIR} to svirt_sandbox_file_t"
+         exit 1
+      fi
+   fi
+fi
+
+docker run -ti --rm -v ${DIR}:/home/dev:rw ${IMAGE} $@
