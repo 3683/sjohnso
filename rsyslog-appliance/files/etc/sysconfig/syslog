@@ -1,0 +1,87 @@
+## Path:		System/Logging
+## Description:		System logging
+## Type:		list(0,1,2,3,4,5,6,7)
+## Default:		1
+## Config:		""
+## ServiceRestart:	syslog
+#
+# Default loglevel for klogd
+#
+KERNEL_LOGLEVEL=1
+
+## Type:		string
+## Default:		""
+## Config:		""
+## ServiceRestart:	syslog
+#
+# if not empty: parameters for syslogd
+# for example SYSLOGD_PARAMS="-r -s my.dom.ain"
+#
+SYSLOGD_PARAMS=""
+
+## Type:		string
+## Default:		-x
+## Config:		""
+## ServiceRestart:	syslog
+#
+# if not empty: parameters for klogd
+# for example KLOGD_PARAMS="-x" to avoid (duplicate) symbol resolution
+#
+KLOGD_PARAMS="-x"
+
+## Type:		list(syslogd,syslog-ng,"")
+## Default:		""
+## Config:		""
+## ServiceRestart:	syslog
+#
+# The name of the syslog daemon to use as syslog service:
+# "syslogd", "syslog-ng" or "" for autodetect.
+#
+SYSLOG_DAEMON="rsyslogd"
+
+## Type:           list(5)
+## Default:        "5"
+## Config:         ""
+## ServiceRestart: syslog
+#
+# The native version compatibility level of the current rsyslogd.
+#
+# Note, that this variable is read-only -- please do not change it!
+# Instead, please adopt the RSYSLOGD_COMPAT_VERSION variable.
+#
+# This variable will be updated while every installation/upgrade of
+# the rsyslog daemon package.
+#
+RSYSLOGD_NATIVE_VERSION="5"
+
+## Type:           integer(0:5)
+## Default:        ""
+## Config:         ""
+## ServiceRestart: syslog
+#
+# Version compatibility level to run rsyslogd with (-c parameter).
+# Set to the desired version number rsyslogd shall be compatible with.
+#
+# Default is to run in native mode if the currently installed rsyslog
+# daemon version.
+#
+# Note: Changes to this variable may need adoption of the config file
+# or break features used in the /etc/init.d/syslog script by default.
+#
+RSYSLOGD_COMPAT_VERSION=""
+
+## Type:           string
+## Default:        ""
+## Config:         ""
+## ServiceRestart: syslog
+#
+# Parameters for rsyslogd, except of the version compatibility (-c)
+# and the config file (-f), because they're used by sysconfig and
+# earlysysconfig init scripts.
+#
+# See also the RSYSLOGD_COMPAT_VERSION variable in this file, the
+# documentation provided in /usr/share/doc/packages/rsyslog/doc by
+# the rsyslog-doc package and the rsyslogd(8) and rsyslog.conf(5)
+# manual pages.
+#
+RSYSLOGD_PARAMS=""
