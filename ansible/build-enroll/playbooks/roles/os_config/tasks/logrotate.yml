@@ -1,0 +1,46 @@
+---
+
+##
+## Setup logrotate
+##
+
+- name: comment dateext in logrotate.conf
+  become: yes
+  lineinfile: dest=/etc/logrotate.conf regexp='^(dateext.*)' line='#\1' backrefs=yes backup=yes owner=root group=root mode=0644 seuser=system_u serole=object_r setype=etc_t
+
+- name: create rootmail logrotate
+  become: yes
+  copy: src=logrotate-rootmail dest=/etc/logrotate.d/rootmail owner=root group=root mode=644 seuser=system_u serole=object_r setype=etc_t
+
+- name: create syslog logrotate
+  become: yes
+  copy: src=logrotate-syslog dest=/etc/logrotate.d/syslog owner=root group=root mode=644 seuser=system_u serole=object_r setype=etc_t
+
+- name: is selinux-logrotate-allow-dir-create semodule loaded
+  become: yes
+  shell: semodule -l | grep -q selinux-logrotate-allow-dir-create
+  register: selinux_logrotate
+  ignore_errors: True
+
+- block:
+  - name: transfer selinux-logrotate-allow-dir-create.te
+    become: yes
+    copy: src=selinux-logrotate-allow-dir-create.te dest=/tmp
+  - name: create selinux-logrotate-allow-dir-create.mod
+    become: yes
+    shell: checkmodule -M -m -o /tmp/selinux-logrotate-allow-dir-create.mod /tmp/selinux-logrotate-allow-dir-create.te
+  - name: create selinux-logrotate-allow-dir-create.pp
+    become: yes
+    shell: semodule_package -o /tmp/selinux-logrotate-allow-dir-create.pp -m /tmp/selinux-logrotate-allow-dir-create.mod
+  - name: load selinux-logrotate-allow-dir-create.pp
+    become: yes
+    shell: semodule -i /tmp/selinux-logrotate-allow-dir-create.pp
+  - name: cleanup selinux-logrotate-allow-dir-create files
+    become: yes
+    file: path={{ item }} state=absent
+    with_items:
+      - /tmp/selinux-logrotate-allow-dir-create.mod
+      - /tmp/selinux-logrotate-allow-dir-create.pp
+      - /tmp/selinux-logrotate-allow-dir-create.te
+  when: "{{ selinux_logrotate.rc != 0 }}"
+

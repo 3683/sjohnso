@@ -1,0 +1,48 @@
+---
+
+##
+## Add ansible user
+##
+
+- name: add sshusers group
+  become: yes
+  group: name=sshusers state=present
+
+- name: create ansible user
+  become: yes
+  user: name=ansible comment="Ansible,,," groups=sshusers append=yes shell=/bin/bash
+
+- block:
+  - name: generate random password for ansible user
+    become: no
+    local_action: shell {{ genpasshashpy }} -s {{ inventory_hostname|lower }} -u ansible -f {{ passfile }}
+    register: pass_hash
+  - name: set ansible password
+    become: yes
+    user: name=ansible password={{ pass_hash.stdout }}
+  when: setpass|default(false)
+
+- name: setup ssh key auth for ansible user
+  become: yes
+  authorized_key:
+    user: ansible
+    key: "{{ lookup('file', '{{ ansible_pub_ssh_key }}') }}"
+
+- name: add ansible user to sshusers group
+  become: yes
+  user: name=ansible groups=sshusers append=yes
+
+- name: give ansible user sudo root access
+  become: yes
+  lineinfile:
+    dest=/etc/sudoers.d/ansible
+    create=yes
+    line='ansible ALL=(ALL) NOPASSWD:ALL'
+    mode=0440
+    owner=root
+    group=root
+    seuser=system_u
+    serole=object_r
+    setype=etc_t
+    validate='visudo -cf %s'
+

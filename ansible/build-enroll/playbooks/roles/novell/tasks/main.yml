@@ -1,0 +1,9 @@
+---
+
+- name: register with Novell
+  shell: /usr/bin/suse_register -a regcode-sles={{ slescode }} -a email={{ slesemail }} -a addressid="{{ slesaddress }}" -a moniker={{ ansible_nodename }} -L /root/.suse_register.log
+  when: slescode is defined and slesemail is defined and slesaddress is defined and ansible_nodename is defined
+
+- name: refresh zypper services
+  shell: /usr/bin/suse_register
+

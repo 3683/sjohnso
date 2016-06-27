@@ -1,0 +1,49 @@
+---
+
+_meta:
+  hostvars:
+    all:
+      passfile: passfile
+
+    server1:
+      ansible_host: 10.10.10.10
+      avamar_server: un-fit-01.backup.hms.cdw.com
+      avamar_domain: CUSTA
+      nimbus_hub_ip: 10.10.10.100
+      bmn:
+        - 10.10.10.100
+      silo:
+        - 10.10.10.100
+      selinux: false
+      rpms:
+      - httpd
+      local_groups:
+      - sshusers
+      users:
+      - name: noc
+        comment: noc user,,,
+        groups:
+        - sshusers
+        home: /home/noc
+        shell: /bin/bash
+        sudo: true
+      lvm:
+        lvs:
+        - mysqldata:
+            fs: ext4
+            mount: /var/lib/mysqldata
+            size: 1G
+            vg: rootvg
+        - mysqlbackup:
+            fs: ext4
+            mount: /var/lib/mysqlbackup
+            size: 1G
+            vg: rootvg
+
+local:
+- 127.0.0.1
+
+group1:
+  hosts:
+  - server1
+

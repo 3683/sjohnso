@@ -1,0 +1,46 @@
+---
+
+##
+## Setup ntp
+##
+
+- block:
+  - name: install ntp (RHEL5/6)
+    become: yes
+    yum: pkg=ntp state=installed
+    when: ansible_distribution_major_version|int < 7
+  - name: install chrony (RHEL7)
+    become: yes
+    yum: pkg=chrony state=installed
+    when: ansible_distribution_major_version|int >= 7
+  - name: determine ntp or chrony
+    shell: "[ -f /etc/chrony.conf ] && echo /etc/chrony.conf || echo /etc/ntp.conf"
+    register: ntpfile
+  - name: create backup of ntp/chrony config
+    become: yes
+    command: creates={{ ntpfile.stdout }}.bak cp -p {{ ntpfile.stdout }} {{ ntpfile.stdout }}.bak
+  - name: get ntp/chrony state
+    become: yes
+    shell: "grep -q '^server {{ bmn[0] }}' {{ ntpfile.stdout }}"
+    register: ntpserver
+    ignore_errors: True
+  - block:
+    - name: modify ntp/chrony comment server lines
+      become: yes
+      shell: sed -i '/^server/s/^/#/g' {{ ntpfile.stdout }} warn=no
+    - name: modify ntp/chrony add server lines
+      become: yes
+      lineinfile: "dest={{ ntpfile.stdout }} insertafter='^#server' line='server {{ item }}'"
+      with_items: "{{ bmn[::-1] }}"
+      register: ntp_modify
+    - name: restart ntp (if needed)
+      become: yes
+      service: name=ntpd state=restarted
+      when: ntp_modify.changed and "{{ ntpfile.stdout }}" == "/etc/ntp.conf"
+    - name: restart chrony (if needed)
+      become: yes
+      service: name=chronyd state=restarted
+      when: ntp_modify.changed and "{{ ntpfile.stdout }}" == "/etc/chrony.conf"
+    when: "{{ ntpserver.rc != 0 }}"
+  when: ansible_distribution == "CentOS" or (ansible_os_family == "RedHat" and {{ rhel.rc | default("1") }} == 0)
+

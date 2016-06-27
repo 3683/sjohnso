@@ -1,0 +1,6 @@
+---
+
+- hosts: group1
+  roles:
+    - { role: avamar, become: yes, become_user: root }
+

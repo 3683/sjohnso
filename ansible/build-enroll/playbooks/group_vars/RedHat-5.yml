@@ -1,0 +1,4 @@
+---
+
+var_snmpd_conf: "/var/net-snmp/snmpd.conf"
+

@@ -1,0 +1,242 @@
+---
+
+## ansible_facts
+- name: dump setup information to file
+  become: no
+  local_action: copy content="{{ hostvars[inventory_hostname]|fixme }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/setup.json
+  no_log: True
+
+## rpms
+- name: get installed rpms list
+  become: no
+  shell: rpm -qa --qf '%{name} %{version} %{release} %{arch}\n' | sort warn=no
+  register: rpm_list
+
+- name: dump installed rpms list to file
+  become: no
+  local_action: copy content="{{ rpm_list.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/rpm_list
+  when: rpm_list.rc == 0
+
+## uname
+- name: get uname information
+  become: no
+  shell: uname -a
+  register: uname_a
+
+- name: dump uname information to file
+  become: no
+  local_action: copy content="{{ uname_a.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/uname_a
+  when: uname_a.rc == 0
+
+## netstat
+- name: get listening ports
+  become: yes
+  shell: netstat -nlp
+  register: netstat_listening
+
+- name: dump listening ports to file
+  become: no
+  local_action: copy content="{{ netstat_listening.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/netstat_listening
+  when: netstat_listening.rc == 0
+
+## ip
+- name: get interface statistics
+  become: no
+  shell: /sbin/ip -s link show
+  register: ip_link_show
+
+- name: dump interface statistics to file
+  become: no
+  local_action: copy content="{{ ip_link_show.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/ip_link_show
+  when: ip_link_show.rc == 0
+
+- name: get IP information
+  become: no
+  shell: /sbin/ip addr list
+  register: ip_addr_list
+
+- name: dump IP information to file
+  become: no
+  local_action: copy content="{{ ip_addr_list.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/ip_addr_list
+  when: ip_addr_list.rc == 0
+
+- name: get route information
+  become: no
+  shell: /sbin/ip route list
+  register: ip_route_list
+
+- name: dump route information to file
+  become: no
+  local_action: copy content="{{ ip_route_list.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/ip_route_list
+  when: ip_route_list.rc == 0
+
+## processes
+- name: get process list
+  become: no
+  shell: ps -ef
+  register: process_list
+
+- name: dump process list to file
+  become: no
+  local_action: "copy content='{{ process_list.stdout }}' dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/process_list"
+  when: process_list.rc == 0
+
+## filesystems
+- name: get mounted filesystems
+  become: yes
+  shell: df -Pk
+  register: df
+
+- name: dump mounted filesystems to file
+  become: no
+  local_action: copy content="{{ df.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/df
+  when: df.rc == 0
+
+## mounts
+- name: get mounts
+  become: yes
+  shell: mount -v warn=no
+  register: mounts
+
+- name: dump mounts to file
+  become: no
+  local_action: copy content="{{ mounts.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/mounts
+  when: mounts.rc == 0
+
+## services
+- name: get chkconfig
+  become: no
+  shell: /sbin/chkconfig --list
+  register: chkconfig_list
+
+- name: dump chkconfig to file
+  become: no
+  local_action: copy content="{{ chkconfig_list.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/chkconfig
+  when: chkconfig_list.rc == 0
+
+- block:
+  - name: get systemd services
+    become: no
+    shell: systemctl list-unit-files --type=service --no-pager
+    register: systemctl_services
+  - name: dump systemd services to file
+    become: no
+    local_action: copy content="{{ systemctl_services.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/systemd_services
+    when: systemctl_services.rc == 0
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int >= 7
+
+## ntp
+- name: get ntp server entries from /etc/ntp.conf
+  become: no
+  shell: grep ^server /etc/ntp.conf | awk '{print $2}'
+  register: ntp_servers
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int < 7
+
+- name: get ntp server entries from /etc/chrony.conf
+  become: no
+  shell: grep ^server /etc/chrony.conf | awk '{print $2}'
+  register: ntp_servers
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int >= 7
+
+- name: ntp A record lookup of ntp servers
+  become: no
+  shell: 'python -c "import socket; socket.inet_aton(\"{{ item }}\")" >/dev/null 2>&1 && echo ip || (dig -t A {{ item }} +ans +short | tail -n 1)'
+  register: dns_items
+  with_items: "{{ ntp_servers.stdout_lines }}"
+
+- name: dump ntp A record lookups to file
+  become: no
+  local_action: "lineinfile line='{{ item.item }}: {{ item.stdout }}' dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/dns_lookups create=yes"
+  when: item.stdout != 'ip'
+  with_items: "{{ dns_items.results }}"
+
+- name: get ntp peers
+  become: yes
+  shell: /usr/sbin/ntpq -nc peers
+  register: ntp_peers
+  ignore_errors: True
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int < 7
+
+- name: get ntp peers
+  become: yes
+  shell: chronyc sources
+  register: ntp_peers
+  ignore_errors: True
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int >= 7
+
+- name: dump ntp peers to file
+  become: no
+  local_action: copy content="{{ ntp_peers.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/ntp_peers
+  when: ntp_peers.rc == 0
+
+- block:
+  - name: get ntp associations
+    become: yes
+    shell: /usr/sbin/ntpq -nc associations
+    register: ntpq_associations
+    ignore_errors: True
+
+  - name: dump ntp associations to file
+    become: no
+    local_action: copy content="{{ ntpq_associations.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/ntpq_associations
+    when: ntpq_associations.rc == 0
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int < 7
+
+## iptables
+- block:
+  - name: get iptables service status
+    become: yes
+    shell: echo $(/sbin/service iptables status 2>&1)
+    register: iptables_status
+
+  - name: get iptables rules
+    become: yes
+    shell: /sbin/iptables -nvL
+    register: iptables_rules
+    when: '"Firewall is stopped" not in iptables_status.stdout and "Firewall is not running" not in iptables_status.stdout'
+
+  - name: dump iptables rules to file
+    become: no
+    local_action: copy content="{{ iptables_rules.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/iptables_rules
+    when: '"Firewall is stopped" not in iptables_status.stdout and "Firewall is not running" not in iptables_status.stdout and iptables_rules.rc == 0'
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int < 7
+
+- block:
+  - name: get firewalld status
+    become: yes
+    command: firewall-cmd --list-all
+    register: firewalld_list
+
+  - name: dump firewalld status to file
+    become: no
+    local_action: copy content="{{ firewalld_list.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/firewalld_list
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int >= 7
+
+## Interface information
+- name: get interfaces
+  become: no
+  shell: "/sbin/ip link list | egrep ^[0-9]+: | awk '{print $2}' | sed -e 's/://' | grep -v lo"
+  register: ip_link_list
+
+- name: get interface information
+  become: yes
+  shell: /sbin/ethtool {{ item }}
+  register: ethtool
+  with_items: "{{ ip_link_list.stdout_lines }}"
+
+- name: dump interface info to files
+  become: no
+  local_action: copy content="{{ item.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/ethool-{{ item.item }}
+  with_items: "{{ ethtool.results }}"
+
+## Check for updates
+- name: check for updates
+  become: yes
+  shell: yum check-update warn=no
+  register: yum_check
+  ignore_errors: true
+
+- name: dump check for updates to file
+  become: no
+  local_action: copy content="{{ yum_check.stdout }}" dest={{ outputdir }}/{{ output }}/{{ inventory_hostname|lower }}/yum-check-updates
+

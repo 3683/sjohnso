@@ -1,0 +1,67 @@
+---
+
+#- debug: var=hostvars[inventory_hostname]
+
+- name: create LVs
+  become: yes
+  lvol: vg={{ item.vg }} lv={{ item.name }} size={{ item.size }}
+  with_items: "{{ lvm['lvs'] }}"
+  when: item.fs != 'swap'
+
+- name: create filesystem on LVs
+  become: yes
+  filesystem: fstype={{ item.fs }} dev=/dev/{{ item.vg }}/{{ item.name }} resizefs=yes
+  with_items: "{{ lvm['lvs'] }}"
+  when: item.fs != 'swap'
+
+- name: create fstab entries for LVs
+  become: yes
+  mount:
+    name={{ item.mount }}
+    src=/dev/mapper/{{ item.vg }}-{{ item.name }}
+    fstype={{ item.fs }}
+    dump={{ item.dump|default('1') }}
+    passno={{ item.passno|default('2') }}
+    state=mounted
+  with_items: "{{ lvm['lvs'] }}"
+  when: item.fs != 'swap'
+
+- name: set ownership and permissions of LVs
+  become: yes
+  file:
+    path={{ item.mount }}
+    state=directory
+    owner={{ item.owner }}
+    group={{ item.group }}
+    mode={{ item.mode }}
+    seuser={{ item.seuser }}
+    serole={{ item.serole }}
+    setype={{ item.setype }}
+  with_items: "{{ lvm['lvs'] }}"
+  when: item.fs != 'swap'
+
+- name: grow swap
+  become: yes
+  lvol: vg={{ item.vg }} lv={{ item.name }} size={{ item.size }}
+  register: grow_swap
+  with_items: "{{ lvm['lvs'] }}"
+  when: item.fs == 'swap'
+
+- block:
+    - name: deactive swap
+      become: yes
+      shell: swapoff /dev/mapper/{{ item.vg }}-{{ item.name }}
+      with_items: "{{ lvm['lvs'] }}"
+      when: item.fs == 'swap'
+    - name: create swapfs
+      become: yes
+      shell: mkswap /dev/mapper/{{ item.vg }}-{{ item.name }}
+      with_items: "{{ lvm['lvs'] }}"
+      when: item.fs == 'swap'
+    - name: active swap
+      become: yes
+      shell: swapon /dev/mapper/{{ item.vg }}-{{ item.name }}
+      with_items: "{{ lvm['lvs'] }}"
+      when: item.fs == 'swap'
+  when: grow_swap.changed
+

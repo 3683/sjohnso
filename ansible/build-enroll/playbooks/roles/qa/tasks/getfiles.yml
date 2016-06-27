@@ -1,0 +1,32 @@
+---
+
+- name: push tar include file
+  become: yes
+  copy: src=tar-includes dest=/root/tar-includes owner=root group=root mode=0644
+
+- name: create tar collection
+  become: yes
+  shell: (umask 077 && cd / && tar zcpf /root/{{ inventory_hostname|lower }}.tar.gz -T /root/tar-includes --ignore-failed-read)
+
+- name: fetch tar collection
+  become: yes
+  fetch:
+    src=/root/{{ inventory_hostname|lower }}.tar.gz
+    dest={{ outputdir }}/{{ fetch }}/{{ inventory_hostname|lower }}/{{ inventory_hostname|lower }}.tar.gz
+    flat=yes
+
+- name: remote clean up
+  become: yes
+  file: path={{ item }} state=absent
+  with_items:
+    - /root/tar-includes
+    - "/root/{{ inventory_hostname|lower }}.tar.gz"
+
+- name: extract local tar collection
+  become: no
+  local_action: shell tar zxpf {{ outputdir }}/{{ fetch }}/{{ inventory_hostname|lower }}/{{ inventory_hostname|lower }}.tar.gz -C {{ outputdir }}/{{ fetch }}/{{ inventory_hostname|lower }} warn=no
+
+- name: local clean up
+  become: no
+  local_action: file path={{ outputdir }}/{{ fetch }}/{{ inventory_hostname|lower }}/{{ inventory_hostname|lower }}.tar.gz  state=absent
+

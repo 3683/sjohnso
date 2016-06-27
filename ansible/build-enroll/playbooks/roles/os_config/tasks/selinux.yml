@@ -1,0 +1,29 @@
+---
+
+##
+## Set SELinux mode
+##
+
+- block:
+  - name: get SELinux mode
+    become: yes
+    shell: getenforce
+    register: getenforce
+  - block:
+    - name: set SELinux from permissive to enforcing (persistent)
+      become: yes
+      lineinfile: dest=/etc/selinux/config regexp='^(SELINUX=).*' line='\1enforcing' backrefs=yes
+    - name: set SELinux from permissive to enforcing (live)
+      become: yes
+      shell: setenforce enforcing
+    when: "{{ selinux }} == true and '{{ getenforce.stdout|lower }}' == 'permissive'"
+  - block:
+    - name: set SELinux from enforcing to permissive (persistent)
+      become: yes
+      lineinfile: dest=/etc/selinux/config regexp='^(SELINUX=).*' line='\1permissive' backrefs=yes
+    - name: set SELinux from enforcing to permissive (live)
+      become: yes
+      shell: setenforce permissive
+    when: "{{ selinux }} == false and '{{ getenforce.stdout|lower }}' == 'enforcing'"
+  when: ansible_os_family == "RedHat"
+

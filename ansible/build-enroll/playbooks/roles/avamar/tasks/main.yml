@@ -1,0 +1,23 @@
+---
+
+- name: load variables
+  include_vars: "variables-{{ ansible_distribution_major_version }}-{{ ansible_architecture }}.yml"
+
+- name: see if AvamarClient is installed
+  shell: rpm -qa --qf '%{name}\n' | egrep -q ^AvamarClient$ warn=no
+  register: avamarinstalled
+  ignore_errors: True
+
+- block:
+  - name: transfer Avamar installer
+    copy: src={{ avamar_installer }} dest=/tmp
+  - name: install Avamar client
+    become: yes
+    shell: yum -y --noplugins localinstall /tmp/{{ avamar_installer }} warn=no
+  - name: remove Avamar installer
+    file: path=/tmp/{{ avamar_installer }} state=absent
+  - name: register Avamar client
+    become: yes
+    shell: /usr/local/avamar/etc/avagent.d register {{ avamar_server }} {{ avamar_domain }}
+  when: "{{ avamarinstalled.rc == 1 }}"
+

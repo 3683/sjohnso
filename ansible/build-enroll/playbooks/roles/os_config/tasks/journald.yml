@@ -1,0 +1,13 @@
+---
+
+##
+## Make journald persistent
+##
+
+- name: Create /var/log/journal
+  become: yes
+  file: path=/var/log/journal state=directory owner=root group=systemd-journal mode=2755 seuser=system_u serole=object_r setype=var_log_t
+  notify:
+    - restart journald
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int >= 7
+

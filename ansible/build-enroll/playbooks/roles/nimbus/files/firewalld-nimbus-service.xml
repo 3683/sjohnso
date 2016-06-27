@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+<short>Nimbus</short>
+  <description>CA Nimbus Monitoring Service</description>
+  <port protocol="tcp" port="48000-48015"/>
+</service>

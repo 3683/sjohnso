@@ -1,0 +1,35 @@
+---
+
+##
+## Setup rsyslog
+##
+
+- name: create backup of rsyslog.conf
+  become: yes
+  shell: creates=/etc/rsyslog.conf.bak (cp -np /etc/rsyslog.conf /etc/rsyslog.conf.bak && chcon --reference /etc/rsyslog.conf /etc/rsyslog.conf.bak >/dev/null 2>&1)
+
+- name: modify rsyslog.conf
+  become: yes
+  script: files/customize-rsyslog-conf.py
+
+- name: include rsyslog.d
+  become: yes
+  lineinfile: dest=/etc/rsyslog.conf line='$IncludeConfig /etc/rsyslog.d/*.conf'
+
+- name: create rsyslog.d
+  become: yes
+  file: path=/etc/rsyslog.d state=directory owner=root group=root mode=0755 seuser=system_u serole=object_r setype=syslog_conf_t
+
+- name: create rsyslog 1-cdw.conf from template
+  become: yes
+  template: src=rsyslog-cdw.conf.j2 dest=/etc/rsyslog.d/1-cdw.conf owner=root group=root mode=0600 seuser=system_u serole=object_r setype=syslog_conf_t
+  notify:
+    - restart rsyslogd
+
+- name: create log files with correct ownership and permissions
+  become: yes
+  file: path={{ item }} state=touch owner=root group=sshusers mode=0640 seuser=system_u serole=object_r setype=var_log_t
+  with_items:
+    - /var/log/all.log
+    - /var/log/maillog
+

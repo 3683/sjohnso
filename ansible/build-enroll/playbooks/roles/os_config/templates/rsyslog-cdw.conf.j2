@@ -1,0 +1,13 @@
+##
+## CDW ManS
+##
+
+# Log to all.log and maillog
+
+mail.*                                  -/var/log/maillog
+*.debug,mail.none			/var/log/all.log
+
+# Log to BMN(s)
+{% for ip in bmn %}
+*.debug,mail.none                       @{{ ip }}
+{% endfor %}

@@ -1,0 +1,24 @@
+---
+
+##
+## Setup iptables
+##
+
+- name: include persistent 161/udp for SILO (without firewalld)
+  become: yes
+  lineinfile: dest=/etc/sysconfig/iptables insertbefore="--dport 22" line="-A INPUT -s {{ item }}/32 -p udp -m udp --dport 161 -j ACCEPT"
+  with_items:
+    - "{{ silo }}" 
+  notify:
+    - reload iptables
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int < 7
+
+- name: include persistent 161/udp for SILO (with firewalld)
+  become: yes
+  shell: firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="{{ item }}/32" port port="161" protocol="udp" accept'
+  with_items:
+    - "{{ silo }}" 
+  notify:
+    - reload firewalld
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int >= 7
+

@@ -1,0 +1,12 @@
+---
+
+- name: re-run setup
+  action: setup
+
+- name: restart SuSEfirewall2
+  shell: SuSEfirewall2 on
+
+- name: reload firewalld
+  become: yes
+  shell: firewall-cmd --reload
+

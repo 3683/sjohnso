@@ -1,0 +1,5 @@
+---
+
+- name: adhoc command
+  shell: echo adhoc command
+

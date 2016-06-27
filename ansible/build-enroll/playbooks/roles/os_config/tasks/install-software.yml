@@ -1,0 +1,12 @@
+---
+
+##
+## Install additional RPMs
+##
+
+- name: install addition RPMs
+  become: yes
+  yum: pkg={{ item }} state=installed
+  with_items: "{{ rpms|default([]) }}"
+  when: item > 0 and item != 'None'
+

@@ -1,0 +1,72 @@
+---
+
+##
+## Setup net-snmp
+##
+
+- name: see if snmp is already running
+  shell: ps -C snmpd -o pid=
+  register: snmpd
+  ignore_errors: true
+
+- block:
+  - include_vars: "group_vars/{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+  - fail: msg="!! NOTICE !! var_snmpd_conf is not defined"
+    when: var_snmpd_conf is not defined
+  - fail: msg="!! NOTICE !! snmpd_password is not defined"
+    when: snmpd_password is not defined
+  - name: install net-snmp
+    become: yes
+    yum: pkg=net-snmp state=installed
+  - name: create /usr/local/bin/snmp-get-local-data.py
+    copy: src=snmp-get-local-data.py dest=/usr/local/bin/snmp-get-local-data.py owner=root group=root mode=0755 seuser=system_u serole=object_r setype=bin_t
+  - name: start snmpd for first time
+    become: yes
+    service: name=snmpd state=started
+  - name: stop snmpd
+    become: yes
+    service: name=snmpd state=stopped
+  - name: backup {{ var_snmpd_conf }} file
+    become: yes
+    shell: "cp -p {{ var_snmpd_conf }} {{ var_snmpd_conf }}.orig"
+  - name: modify {{ var_snmpd_conf }} file
+    become: yes
+    lineinfile: dest={{ var_snmpd_conf }}  state=present line="createUser admin MD5 \"{{ snmpd_password }}\" DES"
+  - name: backup /etc/snmp/snmpd.conf file
+    become: yes
+    shell: cp -p /etc/snmp/snmpd.conf /etc/snmp/snmpd.conf.orig
+  - name: modify /etc/snmp/snmpd.conf file
+    become: yes
+    blockinfile:
+      dest: /etc/snmp/snmpd.conf
+      block: |
+        rouser admin
+        # 1.3.6.1.4.1.
+        # |           3137.
+        # |           |    2.
+        # |           |    | 0
+        # |           |    | |
+        # |           |    | ` OS distro/version (STRING: cdw_os: Suse 11 64bit)
+        # |           |    `-- CDW ManS UNIX/Linux
+        # |           `------- CDW (Berbee)
+        #  `------------------ Private Enterprise
+        extend .1.3.6.1.4.1.3137.2.0 cdw-linux /usr/local/bin/snmp-get-local-data.py
+  - name: enable snmpd (redhat)
+    become: yes
+    service: name=snmpd enabled=yes
+    when: ansible_os_family == "RedHat"
+  - name: enable snmpd (sles)
+    become: yes
+    shell: chkconfig snmpd on 2>/dev/null warn=no
+    when: ansible_os_family == "Suse"
+  - name: start snmpd for last time
+    become: yes
+    service: name=snmpd state=started
+  - name: create /root/.snmp
+    become: yes
+    file: path=/root/.snmp state=directory mode=0700
+  - name: create /root/.snmp/snmp.conf
+    become: yes
+    template: src=root-snmp.conf.j2 dest=/root/.snmp/snmp.conf owner=root group=root mode=0600
+  when: "{{ snmpd.rc }} != 0"
+

@@ -1,0 +1,14 @@
+---
+
+##
+## Sudo
+##
+
+- name: verify /etc/sudoers.d
+  become: yes
+  file: path=/etc/sudoers.d state=directory owner=root group=root mode=0750 seuser=system_u serole=object_r setype=etc_t
+
+- name: check for includedir in /etc/sudoers
+  become: yes
+  lineinfile: dest=/etc/sudoers line='#includedir /etc/sudoers.d' insertafter=EOF validate='visudo -cf %s'
+

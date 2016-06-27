@@ -1,0 +1,31 @@
+---
+
+##
+## get facts
+##
+- setup: fact_path=/dev/null
+
+#- debug: var=hostvars[inventory_hostname]|fixme
+
+##
+## create local directory tree
+##
+
+- name: create base dir
+  become: no
+  local_action: file path={{ outputdir }} state=directory mode=0700
+
+- name: create output dir
+  become: no
+  local_action: file path={{ outputdir }}/{{ item }}/{{ inventory_hostname|lower }} state=directory mode=0755
+  with_items:
+    - "{{ output }}"
+    - "{{ fetch }}"
+
+##
+## dump output and files
+##
+
+- include: getoutput.yml
+- include: getfiles.yml
+

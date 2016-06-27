@@ -1,0 +1,64 @@
+---
+
+- name: look for /opt/{nimbus,nimsoft}
+  shell: '[ -e "/opt/nimbus" -o -e "/opt/nimsoft" ] && echo "already installed" || echo "not installed"'
+  register: nimbus_exists
+
+- block:
+
+  - name: add NimBUS to firewall
+    lineinfile: dest=/etc/sysconfig/SuSEfirewall2 regexp='^(FW_SERVICES_EXT_TCP=.*)"' line='\1 48000:48015"' backrefs=yes backup=yes
+    notify:
+      - restart SuSEfirewall2
+    when: ansible_os_family == "Suse"
+
+  - block:
+    - name: add NimBUS service to firewalld
+      copy: src=firewalld-nimbus-service.xml dest=/etc/firewalld/services/nimbus.xml owner=root group=root mode=0644 seuser=system_u serole=object_r setype=firewalld_etc_rw_t
+    - name: reload firewalld
+      shell: firewall-cmd --reload
+    - name: include persistent NimBUS rules
+      shell: firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="{{ item }}/32" service name="nimbus" accept'
+      with_items:
+        - "{{ bmn }}"
+      notify:
+        - reload firewalld
+    when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int >= 7
+
+  - name: verify iproute is present
+    yum: name=iproute,unzip,tar state=present
+    notify: re-run setup
+    when: ansible_os_family == "RedHat"
+
+  - name: verify iproute2 is present
+    zypper: name=iproute2,unzip,tar state=present
+    notify: re-run setup
+    when: ansible_os_family == "Suse"
+
+  - name: load variables
+    include_vars: "variables-{{ ansible_architecture }}.yml"
+
+  - name: transfer NimBUS installer
+    copy: src={{ nimbus_installer_zip }} dest=/tmp
+
+  #- name: transfer NimBUS loader
+  #  unarchive: src={{ nimbus_loader }} dest=/tmp
+
+  - name: transfer NimBUS loader
+    copy: src={{ nimbus_loader }} dest=/tmp
+
+  - name: extract NimBUS loader
+    command: tar zxpf /tmp/{{ nimbus_loader }} -C /tmp warn=no
+
+  - name: install NimBUS robot
+    shell: /tmp/nimldr/{{ nimbus_dir }}/nimldr -D Berbee -H {{ nimbus_hub_ip }} -F /tmp -f {{ nimbus_installer }} -o 48004 -p /opt/nimsoft -t /opt/nimsoft/tmp -R {{ ansible_default_ipv4.address }} -l /tmp/nimldr.log -E
+
+  - name: remove NimBUS installation files/directories
+    file: path=/tmp/{{ item }} state=absent
+    with_items:
+      - "{{ nimbus_installer_zip }}"
+      - "{{ nimbus_loader }}"
+      - nimldr
+
+  when: nimbus_exists.stdout == 'not installed'
+

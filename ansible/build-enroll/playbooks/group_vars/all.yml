@@ -1,0 +1,14 @@
+---
+
+snmpd_password: 'blah'
+nimbus_hub_ip: 1.1.1.1
+relay_domains:
+  - cdw.com
+  - .cdw.com
+  - binc.net
+  - .binc.net
+slesemail: email@domain.com
+slesaddress: 1600 Pennsylvania Ave NW, Washington, DC 20500
+rhn_user: me@me.com
+rhn_pass: 'blah'
+

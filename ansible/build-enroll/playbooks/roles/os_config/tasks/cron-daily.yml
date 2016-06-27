@@ -1,0 +1,18 @@
+---
+
+##
+## Setup cron dailyjobs for midnight
+##
+
+- block:
+  - name: install cronie-noanacron
+    become: yes
+    yum: pkg=cronie-noanacron state=installed
+  - name: remove cronie-anacron
+    become: yes
+    yum: pkg=cronie-anacron state=removed
+  - name: run daily crons at midnight
+    become: yes
+    lineinfile: dest=/etc/cron.d/dailyjobs regexp='(\* \* \* root .* \/etc\/cron.daily)' line='00 0 \1' backrefs=yes
+  when: ansible_distribution == "CentOS" or (ansible_os_family == "RedHat" and {{ rhel.rc | default("1") }} == 0)
+

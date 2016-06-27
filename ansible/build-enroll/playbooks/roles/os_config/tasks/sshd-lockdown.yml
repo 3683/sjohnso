@@ -1,0 +1,53 @@
+---
+
+##
+## Setup sshd_config
+##
+
+- name: create backup of sshd_config
+  become: yes
+  shell: creates=/etc/ssh/sshd_config.bak (cp -np /etc/ssh/sshd_config /etc/ssh/sshd_config.bak && chcon --reference /etc/ssh/sshd_config /etc/ssh/sshd_config.bak >/dev/null 2>&1)
+
+- name: modify sshd_config
+  become: yes
+  script: files/customize-sshd_config.py
+
+#- name: modify sshd_config Protocol
+#  become: yes
+#  #lineinfile: dest=/etc/ssh/sshd_config regexp='^#[ ]*Protocol.*' line='Protocol 2'
+#  lineinfile: dest=/etc/ssh/sshd_config regexp='^# *Protocol.*' line='Protocol 2'
+#
+#- name: modify sshd_config PermitRootLogin
+#  become: yes
+#  #lineinfile: dest=/etc/ssh/sshd_config regexp='^#[ ]*PermitRootLogin.*' line='PermitRootLogin no'
+#  #lineinfile: dest=/etc/ssh/sshd_config regexp='^#[ ]*PermitRootLogin.*' line='PermitRootLogin yes'
+#  lineinfile: dest=/etc/ssh/sshd_config regexp='^# *PermitRootLogin.*' line='PermitRootLogin yes'
+#
+#- name: modify sshd_config TCPKeepAlive
+#  become: yes
+#  #lineinfile: dest=/etc/ssh/sshd_config regexp='^#[ ]*TCPKeepAlive.*' line='TCPKeepAlive yes'
+#  lineinfile: dest=/etc/ssh/sshd_config regexp='^# *TCPKeepAlive.*' line='TCPKeepAlive yes'
+#
+#- name: modify sshd_config ClientAliveInterval
+#  become: yes
+#  #lineinfile: dest=/etc/ssh/sshd_config regexp='^#[ ]*ClientAliveInterval.*' line='ClientAliveInterval 15'
+#  lineinfile: dest=/etc/ssh/sshd_config regexp='^# *ClientAliveInterval.*' line='ClientAliveInterval 15'
+
+- name: modify sshd_config AllowGroups sshusers
+  become: yes
+  lineinfile: dest=/etc/ssh/sshd_config regexp="^AllowGroups sshusers" line="AllowGroups sshusers"
+  notify:
+    - restart sshd
+
+- name: modify sshd_config PermitRootLogin (existing PermitRootLogin)
+  become: yes
+  lineinfile: dest=/etc/ssh/sshd_config regexp='^PermitRootLogin.*' line='PermitRootLogin no'
+  notify:
+    - restart sshd
+
+- name: modify sshd_config PermitRootLogin (new PermitRootLogin)
+  become: yes
+  lineinfile: dest=/etc/ssh/sshd_config line='PermitRootLogin no'
+  notify:
+    - restart sshd
+

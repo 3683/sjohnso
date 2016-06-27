@@ -1,0 +1,13 @@
+---
+
+##
+## Add local groups
+##
+
+- name: add sshusers group
+  become: yes
+  group:
+    name="{{ item }}"
+    state=present
+  with_items: "{{ local_groups }}"
+

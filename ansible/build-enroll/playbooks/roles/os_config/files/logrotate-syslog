@@ -1,0 +1,100 @@
+# CDW modified syslog rotation file
+# Stores copies of log files in /var/log/archive/YYYY/MM with unique names.
+
+/var/log/all.log /var/log/maillog {
+   rotate 2
+   daily
+   missingok
+   sharedscripts
+   create 0640 root sshusers
+   postrotate
+
+   # Have rsyslogd release the open file handles of the renamed files
+   /usr/bin/pkill -HUP -x rsyslogd
+
+   # Configuration for postrotate script
+   LOG=/var/log/zz-logrotate
+   ARCHIVEDIR=/var/log/archive
+
+   PATH=/usr/bin:/usr/sbin:/usr/local/bin:/bin:/sbin:/usr/local/sbin
+   YEAR=$(date -d yesterday +"%Y")
+   MONTH=$(date -d yesterday +"%m")
+   DAY=$(date -d yesterday +"%d")
+   DESTDIR=${ARCHIVEDIR}/${YEAR}/${MONTH}
+
+   if [ ! -d ${DESTDIR} ] ; then
+      mkdir -p ${DESTDIR}
+   fi
+
+   date >> ${LOG}
+
+   main() {
+      for LOG in $@ ; do
+         echo "Processing ${LOG}"
+
+         BASE=$(basename ${LOG})
+         DEST=${DESTDIR}/${BASE}.${YEAR}${MONTH}${DAY}
+         SOURCE=${LOG}.1
+
+         echo "BASE = ${BASE}"
+         echo "DEST = ${DEST}"
+         echo "SOURCE = ${SOURCE}"
+
+         # To prevent logrotate from overwriting files
+         DESTROOT=${DEST}
+         INT=0
+         while [ -e ${DEST} ] ; do
+            INT=$(expr ${INT} + 1)
+            DEST=${BASE}.${INT}
+         done
+
+         # Compress destination file if necessary
+         ENDING=
+         echo "mv -f ${SOURCE} ${DEST}"
+         mv -f ${SOURCE} ${DEST}
+         if [ $? = 0 ] ; then
+            # Don't compress empty files
+            if [ -s ${DEST} ] ; then
+               if [ -x /usr/bin/bzip2 ] ; then
+                  echo "/usr/bin/bzip2 ${DEST}"
+                  /usr/bin/bzip2 ${DEST}
+                  ENDING=".bz2"
+                  echo "ENDING = .bz2"
+               elif [ -x /bin/gzip ] ; then
+                  echo "/bin/gzip ${DEST}"
+                  /bin/gzip ${DEST}
+                  ENDING=".gz"
+                  echo "ENDING = .gz"
+               fi
+            fi
+         else
+            echo "Error with mv command"
+         fi
+
+         # Calculate and log the MD5 and SHA1 sums of archived log files
+         COMPRESSED=${DEST}${ENDING}
+         MD5=$(md5sum ${COMPRESSED} | awk '{print $1}')
+         SHA1=$(sha1sum ${COMPRESSED} | awk '{print $1}')
+
+         chown root:sshusers ${COMPRESSED}
+         chmod 640 ${COMPRESSED}
+
+         echo "COMPRESSED = ${COMPRESSED}"
+         echo "MD5 = ${MD5}"
+         echo "SHA1 = ${SHA1}"
+
+         logger -p user.info "MD5 for ${COMPRESSED}: ${MD5}"
+         logger -p user.info "SHA1 for ${COMPRESSED}: ${SHA1}"
+         echo -e "${MD5}  ${COMPRESSED}" >> ${DESTDIR}/MD5
+         echo -e "${SHA1}  ${COMPRESSED}" >> ${DESTDIR}/SHA1
+
+         echo
+      done
+   }
+
+   #main $* 2>&1 | tee -a ${LOG}
+   main $* >> ${LOG} 2>&1
+
+   true
+   endscript
+}

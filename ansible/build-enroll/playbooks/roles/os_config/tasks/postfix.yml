@@ -1,0 +1,21 @@
+---
+
+##
+## Setup postfix
+##
+
+- name: create postfix transport
+  become: yes
+  lineinfile: dest=/etc/postfix/transport line="{{ item[0] }} smtp:[{{ item[1] }}]"
+  with_nested:
+    - "{{ relay_domains }}"
+    - "{{ bmn }}"
+  notify:
+    - recreate postfix transport
+
+- name: modify postfix main.cf
+  become: yes
+  lineinfile: dest=/etc/postfix/main.cf line='transport_maps = hash:/etc/postfix/transport'
+  notify:
+    - restart postfix
+

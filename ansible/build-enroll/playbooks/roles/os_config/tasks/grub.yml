@@ -1,0 +1,39 @@
+---
+
+##
+## Setup grub
+##
+
+- block:
+  - name: set grub default timeout
+    become: yes
+    lineinfile: dest={{ item }} regexp='^(timeout)=.*' line='\1=20' backrefs=yes
+    with_items:
+      - /boot/grub/grub.conf
+      - /boot/grub/menu.lst
+  - name: comment out grub hiddenmenu
+    become: yes
+    lineinfile: dest={{ item }} regexp='^(hiddenmenu.*)' line='#\1' backrefs=yes
+    with_items:
+      - /boot/grub/grub.conf
+      - /boot/grub/menu.lst
+  - name: comment out grub splashimage
+    become: yes
+    lineinfile: dest={{ item }} regexp='^(splashimage.*)' line='#\1' backrefs=yes
+    with_items:
+      - /boot/grub/grub.conf
+      - /boot/grub/menu.lst
+  - name: remove rhgb from grub
+    become: yes
+    lineinfile: dest={{ item }} regexp='^(.*) rhgb(.*)$' line='\1\2' backrefs=yes
+    with_items:
+      - /boot/grub/grub.conf
+      - /boot/grub/menu.lst
+  - name: remove quiet from grub
+    become: yes
+    lineinfile: dest={{ item }} regexp='^(.*) quiet(.*)$' line='\1\2' backrefs=yes
+    with_items:
+      - /boot/grub/grub.conf
+      - /boot/grub/menu.lst
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version|int < 7
+

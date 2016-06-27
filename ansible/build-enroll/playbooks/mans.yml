@@ -1,0 +1,8 @@
+---
+
+- hosts: group1
+  gather_facts: yes
+  roles:
+    - { role: clean, become: yes, become_user: root }
+    - { role: os_config, become: yes, become_user: root }
+

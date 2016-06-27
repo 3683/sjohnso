@@ -1,0 +1,7 @@
+---
+
+nimbus_loader: nimldr-3_57.tar.Z
+nimbus_installer: install_LINUX_23_64-7_63
+nimbus_installer_zip: "{{ nimbus_installer }}.zip"
+nimbus_dir: LINUX_23_64
+

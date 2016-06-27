@@ -1,0 +1,10 @@
+module selinux-logrotate-allow-dir-create 1.0;
+
+require {
+	type var_log_t;
+	type logrotate_t;
+	class dir create;
+}
+
+#============= logrotate_t ==============
+allow logrotate_t var_log_t:dir create;

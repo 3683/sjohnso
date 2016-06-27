@@ -1,0 +1,48 @@
+---
+
+##
+## Add other local users
+##
+
+- name: add local user
+  become: yes
+  user:
+    name="{{ item.name }}"
+    comment="{{ item.comment }}"
+    groups="{{ item.groups|join(',') }}"
+    append=yes
+    shell=/bin/bash
+    password="{{ item.hash|default('this_hash_is_invalid') }}"
+  with_items: "{{ users }}"
+
+- name: add local user authorized_keys
+  become: yes
+  authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ lookup('file', '{{ item.public_key }}') }}"
+  with_items: "{{ users }}"
+  when: "'{{ item.public_key|default() }}' != ''"
+
+- name: grant users sudo root access
+  #line="{{ item.name}} ALL=(ALL) NOPASSWD:ALL"
+  become: yes
+  lineinfile:
+    dest="/etc/sudoers.d/{{ item.name }}"
+    create=yes
+    line="{{ item.name}} ALL=(ALL) ALL"
+    mode=0440
+    owner=root
+    group=root
+    seuser=system_u
+    serole=object_r
+    setype=etc_t
+    validate='visudo -cf %s'
+  with_items: "{{ users }}"
+  when: "{{ item.sudo|default('false') }} == true"
+
+- name: revoke users sudo root access
+  become: yes
+  file: path="/etc/sudoers.d/{{ item.name }}" state=absent
+  with_items: "{{ users }}"
+  when: "{{ item.sudo|default('true') }} == false"
+

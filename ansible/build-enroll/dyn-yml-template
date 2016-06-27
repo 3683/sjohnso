@@ -1,0 +1,21 @@
+    __SERVER__:
+      ansible_host: __IP__
+      avamar_server: __AVAMAR_SERVER__
+      avamar_domain: __AVAMAR_DOMAIN__
+      nimbus_hub_ip: __NIMBUS_HUB_IP__
+      bmn:
+        - __BMN__
+      silo:
+        - __SILO__
+      selinux: false
+      local_groups:
+      - sshusers
+      users:
+      - name: noc
+        comment: noc user,,,
+        groups:
+        - sshusers
+        home: /home/noc
+        shell: /bin/bash
+        sudo: true
+        public_key: keys/id_rsa_noc.pub

@@ -1,0 +1,73 @@
+---
+
+#- debug: var=hostvars[inventory_hostname]|fixme
+
+##
+## Determine if CentOS or RHEL
+##
+
+- name: check if RHEL
+  shell: grep -q 'Red Hat Enterprise Linux' /etc/redhat-release
+  register: rhel
+  ignore_errors: True
+
+# Set SELinux mode
+- include: selinux.yml
+
+# Register with RedHat
+- include: rhn.yml
+
+# Install python requirements for ansible
+- name: install libselinux-python
+  become: yes
+  yum: pkg=libselinux-python state=installed
+  when: ansible_os_family == "RedHat"
+
+# Make journald persistent
+- include: journald.yml
+
+# Setup LVM filesystems
+- include: lvm.yml
+
+# Setup cron dailyjobs for midnight
+- include: cron-daily.yml
+
+# Add local groups
+- include: add-local-groups.yml
+
+# Sudo
+- include: sudo-includedir.yml
+
+# Add ansible user
+- include: add-ansible-user.yml
+
+# Add other local users
+- include: add-local-users.yml
+
+# Setup ntp
+- include: ntp.yml
+
+# Setup logrotate
+- include: logrotate.yml
+
+# Setup rsyslog
+- include: rsyslog.yml
+
+# Setup postfix
+- include: postfix.yml
+
+# Setup iptables
+- include: iptables.yml
+
+# Setup grub
+- include: grub.yml
+
+# Setup net-snmp
+- include: snmp.yml
+
+# Install additional RPMs
+- include: install-software.yml
+
+# Setup sshd_config
+- include: sshd-lockdown.yml
+

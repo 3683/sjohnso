@@ -1,0 +1,49 @@
+---
+
+- block:
+  - name: disable subscription-manager RHN plugin
+    become: yes
+    replace: dest=/etc/yum/pluginconf.d/subscription-manager.conf regexp='^(enabled).*' replace='\1=0' backup=yes owner=root group=root mode=0644 seuser=system_u serole=object_r setype=etc_t
+  - name: disable RHN services
+    become: yes
+    service: name={{ item }} enabled=no
+    with_items:
+      - rhnsd
+      - rhsmcertd
+  - name: stop RHN services
+    become: yes
+    service: name={{ item }} state=stopped
+    #shell: service {{ item }} stop warn=no
+    ignore_errors: True
+    with_items:
+      - rhnsd
+      - rhsmcertd
+
+  - name: get RHN subscription status (RHEL5/6)
+    become: yes
+    shell: /usr/sbin/rhn_check
+    register: rhncheck
+    ignore_errors: True
+    when: ansible_distribution_major_version|int < 7
+
+  - name: register with RHN (RHEL5/6)
+    become: yes
+    shell: /usr/sbin/rhnreg_ks --username={{ rhn_user }} --password={{ rhn_pass }} --profilename={{ ansible_hostname }}
+    no_log: True
+    when: ansible_distribution_major_version|int < 7 and {{ rhncheck.rc | default("0") }} != 0
+
+  - name: get RHN subscription status (RHEL7)
+    become: yes
+    shell: "subscription-manager version | grep -q 'not registered'"
+    register: rhn_subscription
+    ignore_errors: True
+    when: ansible_distribution_major_version|int >= 7
+
+  - name: register with RHN (RHEL7)
+    become: yes
+    shell: subscription-manager register --username='{{ rhn_user }}' --password='{{ rhn_pass }}' --auto-attach
+    no_log: True
+    when: ansible_distribution_major_version|int >= 7 and {{ rhn_subscription.rc | default("1") }} == 0
+
+  when: ansible_os_family == "RedHat" and {{ rhel.rc | default("1") }} == 0
+

@@ -1,0 +1,39 @@
+---
+
+- name: restart rsyslogd
+  become: yes
+  service: name=rsyslog state=restarted
+
+- name: restart sshd
+  become: yes
+  service: name=sshd state=restarted
+
+- name: restart ntp
+  become: yes
+  service: name=ntp state=restarted
+
+- name: restart chrony
+  become: yes
+  service: name=chrony state=restarted
+
+- name: recreate postfix transport
+  become: yes
+  shell: /usr/sbin/postmap /etc/postfix/transport
+
+- name: restart postfix
+  become: yes
+  service: name=postfix state=restarted
+
+- name: reload iptables
+  become: yes
+  service: name=iptables state=restarted
+
+- name: reload firewalld
+  become: yes
+  shell: firewall-cmd --reload
+
+- name: restart journald
+  become: yes
+  service: name=systemd-journald state=restarted
+  #shell: systemctl restart systemd-journald.service
+
