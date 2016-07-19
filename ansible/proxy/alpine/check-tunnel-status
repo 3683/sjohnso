@@ -1,0 +1,100 @@
+#!/usr/bin/env python
+
+import os
+import re
+import sys
+import yaml
+import time
+import shlex
+import subprocess
+from optparse import OptionParser
+from optparse import Option, OptionValueError
+
+self = os.path.basename(sys.argv[0])
+HZ = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
+
+class MultipleOption(Option):
+    ACTIONS = Option.ACTIONS + ("extend",)
+    STORE_ACTIONS = Option.STORE_ACTIONS + ("extend",)
+    TYPED_ACTIONS = Option.TYPED_ACTIONS + ("extend",)
+    ALWAYS_TYPED_ACTIONS = Option.ALWAYS_TYPED_ACTIONS + ("extend",)
+
+    def take_action(self, action, dest, opt, value, values, parser):
+        if action == "extend":
+            values.ensure_value(dest, []).append(value)
+        else:
+            Option.take_action(self, action, dest, opt, value, values, parser)
+
+def run(cmd):
+    cmdargs = shlex.split(cmd)
+    p = subprocess.Popen(cmdargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (stdout, stderr) = p.communicate()
+    return p.returncode, stdout, stderr
+
+def proc_age_secs(pid):
+    system_stats = open('/proc/stat').readlines()
+    process_stats = open('/proc/%d/stat' % pid).read().split()
+    for line in system_stats:
+        if line.startswith('btime'):
+            boot_timestamp = int(line.split()[1])
+    age_from_boot_jiffies = int(process_stats[21])
+    age_from_boot_timestamp = age_from_boot_jiffies / HZ
+    age_timestamp = boot_timestamp + age_from_boot_timestamp
+    return int(time.time() - age_timestamp)
+
+def eprint(msg):
+    print >> sys.stderr, msg
+
+def main():
+    usage = "%s [OPTION]... [OPTION]..." % self
+    parser = OptionParser(option_class=MultipleOption,
+                          usage=usage)
+    parser.add_option('-c', '--config', action="store", type="string", dest='config',
+                      help='path to ssh config')
+    parser.add_option('-f', '--file', action="store", type="string", dest='file',
+                      help='path to YAML hosts config')
+
+    if len(sys.argv) == 1:
+        parser.parse_args(['--help'])
+
+    options, args = parser.parse_args()
+
+    if not options.config:
+        parser.error('must specify path to ssh config')
+    elif not options.file:
+        parser.error('must specify path to YAML hosts config')
+
+    if not os.path.isfile(options.config):
+        print('ERROR: %s does not exist' % options.config)
+        sys.exit(1)
+    if not os.path.isfile(options.file):
+        print('ERROR: %s does not exist' % options.file)
+        sys.exit(1)
+
+    with open(options.file) as data_file:
+        data = yaml.load(data_file)
+
+    bmns = {}
+    for bmn in data:
+        results = run('ssh -F %s -O check %s' % (options.config, bmn))
+        if results[0] == 0:
+            m = re.search("pid=(\d+)", results[2])
+            if m:
+                age = proc_age_secs(int(m.group(1)))
+            else:
+                age = -1
+        else:
+            age = -2
+        bmns[bmn] = age
+
+    for bmn in sorted(bmns):
+        if bmns[bmn] >= 0:
+            print('%s = %s' % (bmn, time.strftime("%H:%M:%S", time.gmtime(bmns[bmn]))))
+        elif bmns[bmn] == -1:
+            print('%s = Unable to determine' % bmn)
+        elif bmns[bmn] == -2:
+            print('%s = no tunnel' % bmn)
+
+if __name__ == '__main__':
+    main()
+

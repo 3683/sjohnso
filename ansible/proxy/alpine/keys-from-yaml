@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import yaml
+
+self = os.path.basename(sys.argv[0])
+
+try:
+    with open(sys.argv[1]) as data_file:
+        data = yaml.load(data_file)
+    for key in sorted(data):
+        print key
+except:
+    sys.exit(1)
+

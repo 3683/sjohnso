@@ -1,0 +1,65 @@
+#!/bin/bash
+
+SELF=$(basename $0)
+
+usage() {
+   cat << USAGE
+Usage: ${SELF} [OPTION]... [OPTION]...
+
+Options:
+  -h|--help             show this help message and exit
+  -c|--config CONFIG    path to ssh config file to use
+  -b|--bmn BMN          name of BMNs to initiate connects to
+                        (use multiple -b to specify more than one)
+USAGE
+   exit 1
+}
+
+error() {
+   echo "ERROR: $1"
+   exit 1
+}
+
+if [[ ! "$@" ]] ; then
+   usage
+fi
+
+TEMP=$(getopt -o hb:c: -l help,bmn:,config: -n ${SELF} -- "$@")
+if [ $? != 0 ] ; then
+   usage
+fi
+
+eval set -- "${TEMP}"
+
+while true ; do
+   case "$1" in
+      -b|--bmn)
+         BMNS+=($2); shift;;
+      -c|--config)
+         CONFIG=$2; shift;;
+      -h|--help)
+         usage;;
+      --)
+         shift; break;;
+      *)
+         usage;;
+   esac
+   shift
+done
+
+if [ "${CONFIG}" = "" ] ; then
+   error "must specify the ssh config file to create... exiting."
+fi
+if ! [[ "${CONFIG}" =~ ^/ ]] ; then
+   error "ssh config path must start with '~/' or '/'"
+fi
+if [[ ${#BMNS[@]} -le 0 ]] ; then
+   error "must specify at least one BMN... exiting."
+fi
+
+# Start controlmaster for each BMN
+for BMN in ${BMNS[@]} ; do
+   CMD="ssh -x -F ${CONFIG} -N -f ${BMN}"
+   echo "Executing: ${CMD}"
+   ${CMD}
+done

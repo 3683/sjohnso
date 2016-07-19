@@ -1,0 +1,4 @@
+#!/bin/bash
+
+pidof screen | xargs kill
+pidof ssh | xargs kill

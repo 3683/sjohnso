@@ -1,0 +1,171 @@
+#!/bin/bash
+
+SELF=$(basename $0)
+
+usage() {
+   cat << USAGE
+Usage: ${SELF} [OPTION]... [OPTION]...
+
+Options:
+  -h|--help             show this help message and exit
+  -p|--proxy BASTION    bastion fully qualified domain name
+                        (e.g. h-custmgmt-msn-1.binc.net)
+  -c|--config CONFIG    path to ssh config file to create
+  -u|--user USER        bastion user to connect as
+  -f|--file FILE        path to YAML hosts config
+USAGE
+   exit 1
+}
+
+error() {
+   echo "ERROR: $1"
+   exit 1
+}
+
+if [[ ! "$@" ]] ; then
+   usage
+fi
+
+TEMP=$(getopt -o hp:f:c:u: -l help,proxy:,file:,config:,user: -n ${SELF} -- "$@")
+if [ $? != 0 ] ; then
+   usage
+fi
+
+eval set -- "${TEMP}"
+
+while true ; do
+   case "$1" in
+      -p|--proxy)
+         BASTION=$2; shift;;
+      -f|--file)
+         FILE=$2; shift;;
+      -c|--config)
+         CONFIG=$2; shift;;
+      -u|--user)
+         BASTIONUSER=$2; shift;;
+      -h|--help)
+         usage;;
+      --)
+         shift; break;;
+      *)
+         usage;;
+   esac
+   shift
+done
+
+if [ "${BASTION}" = "" ] ; then
+   error "must specify proxy (bastion)... exiting."
+fi
+if [ "${CONFIG}" = "" ] ; then
+   error "must specify the ssh config file to create... exiting."
+fi
+if [ ! -f "${FILE}" ] ; then
+   error "the YAML hosts config file specified does not exist... exiting."
+fi
+if [ "${BASTIONUSER}" = "" ] ; then
+   error "must specify user to connect as... exiting."
+fi
+if ! [[ "${CONFIG}" =~ ^/ ]] ; then
+   error "ssh config path must start with '~/' or '/'"
+fi
+
+REQUIRED=(
+keys-from-yaml
+update-ssh-config-with-hosts
+)
+for REQ in ${REQUIRED[@]} ; do
+   if [ ! -f "/usr/local/bin/${REQ}" ] ; then
+      error "utility script /usr/local/bin/${REQ} does not exist... exiting."
+   fi
+done
+
+BMNS=($(/usr/local/bin/keys-from-yaml ${FILE}))
+if [[ ${#BMNS[@]} -le 0 ]] ; then
+   error "must specify at least one BMN... exiting."
+fi
+
+BASTIONSHORT=$(echo ${BASTION} | cut -d\. -f1)
+
+mkdir -p ~/.ansible/cp
+chmod 700 ~/.ansible
+chmod 700 ~/.ansible/cp
+
+cat << CFG > $HOME/.ansible.cfg
+[defaults]
+host_key_checking = False
+
+[ssh_connection]
+ssh_args = -F ${CONFIG}
+CFG
+
+touch ${CONFIG}
+chmod 0600 ${CONFIG}
+cat << HEADER > ${CONFIG}
+ControlMaster auto
+ControlPath ~/.ansible/cp/ansible-ssh-%h-%p-%r
+UserKnownHostsFile /dev/null
+StrictHostKeyChecking no
+
+Host ${BASTIONSHORT}
+  Hostname ${BASTION}
+  User ${BASTIONUSER}
+  ForwardAgent yes
+  ControlPersist 480m
+
+HEADER
+
+# Start controlmaster for bastion
+ssh -x -F ${CONFIG} -N -f ${BASTIONSHORT}
+
+ipregex='set pfip=(\S+)'
+portregex='set pfport=(\S+)'
+
+# For each BMN, get IP and port for ssh access
+for BMN in ${BMNS[@]} ; do
+   ABBR=$(echo ${BMN} | cut -d- -f1)
+   IP=none
+   PORT=none
+   CMD="ssh -x -F ${CONFIG} ${BASTION} cat /opt/access/${ABBR}/${BMN}"
+   echo "Executing: ${CMD}"
+   OUT=$(${CMD})
+   SAVEIFS=${IFS}
+   IFS=$'\n'
+   for LINE in ${OUT} ; do
+      if [[ ${LINE} =~ $ipregex ]] ; then
+         IP=${BASH_REMATCH[1]}
+      elif [[ ${LINE} =~ $portregex ]] ; then
+         PORT=${BASH_REMATCH[1]}
+      fi
+   done
+   IFS=${SAVEIFS}
+
+   SKIP=no
+   if [ "${IP}" = "none" ] ; then
+      echo "IP for ${BMN} was not detected... skipping ${BMN}"
+      SKIP=yes
+   elif [ "${PORT}" = "none" ] ; then
+      echo "port for ${BMN} was not detected... skipping ${BMN}"
+      SKIP=yes
+   fi
+
+   # Create stanza if IP and PORT were defined
+   if [ "${SKIP}" = "no" ] ; then
+      cat << SECTION >> ${CONFIG}
+Host ${BMN}
+  User ${BASTIONUSER}
+  Port ${PORT}
+  Hostname ${IP}
+  ProxyCommand ssh -x -F ${CONFIG} -q -W %h:%p ${BASTIONSHORT}
+  ForwardAgent yes
+  ControlPersist 480m
+
+SECTION
+   fi
+
+done
+
+# Append target systems to ssh config
+/usr/local/bin/update-ssh-config-with-hosts -c ${CONFIG} -f ${FILE}
+
+# Stop controlmaster for bastion
+#ssh -F ${CONFIG} -O exit ${BASTIONSHORT}

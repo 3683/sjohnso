@@ -1,0 +1,83 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import yaml
+import json
+from optparse import OptionParser
+from optparse import Option, OptionValueError
+
+self = os.path.basename(sys.argv[0])
+
+class MultipleOption(Option):
+    ACTIONS = Option.ACTIONS + ("extend",)
+    STORE_ACTIONS = Option.STORE_ACTIONS + ("extend",)
+    TYPED_ACTIONS = Option.TYPED_ACTIONS + ("extend",)
+    ALWAYS_TYPED_ACTIONS = Option.ALWAYS_TYPED_ACTIONS + ("extend",)
+
+    def take_action(self, action, dest, opt, value, values, parser):
+        if action == "extend":
+            values.ensure_value(dest, []).append(value)
+        else:
+            Option.take_action(self, action, dest, opt, value, values, parser)
+
+def run(cmd):
+    cmdargs = shlex.split(cmd)
+    p = subprocess.Popen(cmdargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (stdout, stderr) = p.communicate()
+    return p.returncode, stdout, stderr
+
+def main():
+    usage = "%s [OPTION]... [OPTION]..." % self
+    parser = OptionParser(option_class=MultipleOption,
+                          usage=usage)
+    parser.add_option('-c', '--config', action="store", type="string", dest='config',
+                      help='path to ssh config')
+    parser.add_option('-f', '--file', action="store", type="string", dest='file',
+                      help='path to YAML hosts config')
+
+    if len(sys.argv) == 1:
+        parser.parse_args(['--help'])
+
+    options, args = parser.parse_args()
+
+    if not options.config:
+        parser.error('must specify path to ssh config')
+    elif not options.file:
+        parser.error('must specify path to YAML hosts config')
+
+    if not os.path.isfile(options.file):
+        print('ERROR: %s does not exist' % options.file)
+        sys.exit(1)
+
+    with open(options.file) as data_file:
+        data = yaml.load(data_file)
+
+    config = options.config
+
+    entry = '''Host %(server)s
+  ProxyCommand ssh -x -F %(config)s -q -W %%h:%%p %(bmn)s
+  ControlPersist 5m
+'''
+
+    def eprint(msg):
+        print >> sys.stderr, msg
+
+    # Append to file (create if needed)
+    try:
+        fd = os.open(options.config, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o0600)
+        f = os.fdopen(fd, "wb")
+    except:
+        eprint('ERROR: unable to open %s' % options.config)
+        sys.exit(1)
+
+    for bmn in data:
+        for server in data[bmn]:
+            f.write(entry % locals())
+            f.write('\n')
+
+    f.close
+
+if __name__ == '__main__':
+    main()
+
