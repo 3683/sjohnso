@@ -1,6 +1,6 @@
 # Setup docker container
 
-Follow the steps below to stage the docker container and configuration files.  After that is complete, end-point systems should be accessible directly via the docker container for use within Ansible playbooks.
+Follow the steps below to stage the docker container.  After that is complete, a docker container will be available that has ansible installed (and its dependencies) and scripts that facilitate the creation of the ssh proxies.
 
 #### 1. Clone 'sjohnso' github.com repository:
 ```
@@ -33,6 +33,8 @@ cd proxy
 ```
 
 # Setup ssh proxies within docker container
+
+Follow the steps below to stage the docker container and configuration files.  After that is complete, end-point systems should be accessible directly via the docker container for use within Ansible playbooks.
 
 #### 1. Create a YAML configuration file that describes which BMN each system connects through:
 ```
