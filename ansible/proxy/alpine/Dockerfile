@@ -12,6 +12,7 @@ RUN apk add --update \
     python \
     python-dev \
     py-pip \
+    sudo \
     sshpass \
     tzdata && \
     pip install --upgrade pip && \

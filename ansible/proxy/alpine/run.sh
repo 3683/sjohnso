@@ -16,6 +16,8 @@ if [ ! -e "/.done" ] ; then
    passwd -u ${USER}
 
    chown ${USERID}:${GROUPID} /a
+   echo "${USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USER}
+   chmod 640 /etc/sudoers.d/${USER}
 fi
 
 if [ "${AUTHORIZED_KEYS}" != "**None**" ]; then
