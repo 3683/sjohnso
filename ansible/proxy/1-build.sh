@@ -26,7 +26,7 @@ fi
 getopt -T > /dev/null
 if [ $? -eq 4 ]; then
    # GNU enhanced getopt is available
-   set -- `getopt -o hi: -l help,image: -n ${SELF} -- "$@"`
+   eval set -- `getopt -o hi: -l help,image: -n ${SELF} -- "$@"`
 else
    # Original getopt is available
    set -- `getopt hi: "$@"`
